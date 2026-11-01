@@ -68,6 +68,37 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     } catch (err) { console.error(err); res.status(500).json({ success: false, message: '登录失败' }) }
 });
 app.post('/api/auth/logout', (_req, res) => { res.clearCookie(cookieName, { ...cookieOptions, maxAge: undefined }); res.json({ success: true }) });
+
+// 永久注销当前账号及其图纸；使用事务保证删除操作整体成功或失败。
+app.delete('/api/auth/account', requireAuth, authLimiter, async (req, res) => {
+    const password = req.body?.password;
+    if (typeof password !== 'string' || !password || password.length > 200) {
+        return res.status(400).json({ success: false, message: '请输入当前账号密码' });
+    }
+    let conn;
+    try {
+        conn = await db.getConnection();
+        await conn.beginTransaction();
+        const [users] = await conn.execute('SELECT password_hash FROM users WHERE id=? FOR UPDATE', [req.userId]);
+        if (!users.length || !(await bcrypt.compare(password, users[0].password_hash))) {
+            await conn.rollback();
+            return res.status(401).json({ success: false, message: '密码不正确，请重试' });
+        }
+        await conn.execute('DELETE FROM patterns WHERE user_id=?', [req.userId]);
+        const [result] = await conn.execute('DELETE FROM users WHERE id=?', [req.userId]);
+        if (result.affectedRows !== 1) throw new Error('账号删除失败');
+        await conn.commit();
+        res.clearCookie(cookieName, { ...cookieOptions, maxAge: undefined });
+        return res.json({ success: true, message: '账号及全部图纸已永久删除' });
+    } catch (err) {
+        if (conn) { try { await conn.rollback(); } catch (rollbackErr) { console.error('事务回滚失败:', rollbackErr); } }
+        console.error('注销账号失败:', err);
+        return res.status(500).json({ success: false, message: '注销失败，账号和图纸未确认删除，请稍后重试' });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
 app.get('/api/auth/me', requireAuth, async (req, res) => { try { const [rows] = await db.execute('SELECT id,email FROM users WHERE id=?', [req.userId]); if (!rows.length) return res.status(401).json({ success: false, message: '用户不存在' }); res.json({ success: true, user: rows[0] }) } catch (e) { console.error(e); res.status(500).json({ success: false, message: '查询失败' }) } });
 app.get('/api/health', async (_req, res) => { try { await db.query('SELECT 1'); res.json({ success: true, message: '数据库连接正常' }) } catch { res.status(500).json({ success: false, message: '数据库连接失败' }) } });
 function mapRow(row) { let grid = row.grid_data; if (typeof grid === 'string') { try { grid = JSON.parse(grid) } catch { grid = [] } } let counts = row.counts; if (typeof counts === 'string') { try { counts = JSON.parse(counts) } catch { counts = [] } } return { ...row, grid_data: grid, counts: counts || [], total_beads: row.total_beads ?? 0 } };
