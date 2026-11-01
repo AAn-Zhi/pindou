@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
+const fs = require('fs');
+const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
@@ -23,7 +25,13 @@ const db = mysql.createPool({
 
     // 云端数据库启用 SSL，本地数据库保持原来的连接方式
     ...(process.env.DB_SSL === 'true'
-        ? { ssl: { minVersion: 'TLSv1.2' } }
+        ? {
+            ssl: {
+                ca: fs.readFileSync(path.join(__dirname, 'ca.pem')),
+                minVersion: 'TLSv1.2',
+                rejectUnauthorized: true
+            }
+        }
         : {})
 });
 const secret = process.env.JWT_SECRET;
