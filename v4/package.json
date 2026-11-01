@@ -1,0 +1,19 @@
+{
+  "name": "doudou-gongfang-v4",
+  "version": "4.0.0",
+  "private": true,
+  "description": "豆豆工坊 V4 多用户 MySQL 版本",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "mysql2": "^3.11.5",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "cookie-parser": "^1.4.7",
+    "express-rate-limit": "^7.5.0"
+  }
+}

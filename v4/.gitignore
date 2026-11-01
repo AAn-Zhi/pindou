@@ -1,0 +1,10 @@
+# 环境变量和密钥
+.env
+.env.*
+!.env.example
+
+# Node.js 依赖
+node_modules/
+
+# 日志文件
+*.log
